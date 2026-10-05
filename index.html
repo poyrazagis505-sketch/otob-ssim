@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="tr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Otobüs Tycoon</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+:root{--bg:#0f172a;--card:#1e293b;--tx:#e2e8f0;--ac:#f59e0b;--ok:#22c55e;--bad:#ef4444}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:var(--bg);color:var(--tx)}
+main{max-width:960px;margin:auto;padding:10px}
+.card{background:var(--card);border-radius:12px;padding:12px;margin:10px 0}
+h3{margin:0 0 8px;color:var(--ac)}
+button,select,input{font:inherit;padding:6px 9px;border-radius:8px;border:1px solid #334155;background:#0b1220;color:var(--tx)}
+button{background:var(--ac);color:#000;border:0;cursor:pointer;font-weight:600}
+button:disabled{opacity:.4;cursor:not-allowed}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:space-between;padding:6px 0;border-bottom:1px solid #334155}
+.st{display:flex;gap:14px;flex-wrap:wrap;font-weight:600}.big{font-size:24px}small{opacity:.7}
+.w{display:flex;gap:6px;flex-wrap:wrap}.ev{border:2px solid var(--bad)}
+#log{max-height:170px;overflow:auto;font-size:14px}svg{width:100%;background:#0b1220;border-radius:8px}
+</style></head><body><main>
+<div id="auth" class="card"><h3>🚌 Otobüs Tycoon</h3>
+<p><input id="co" placeholder="Firma adı (kayıt için)"></p>
+<p><input id="em" type="email" placeholder="E-posta"> <input id="pw" type="password" placeholder="Şifre (min 6)"></p>
+<button onclick="auth(0)">Giriş</button> <button onclick="auth(1)">Kayıt ol</button><p id="err" style="color:var(--bad)"></p></div>
+<div id="game" hidden></div></main>
+<script>
+// ===== AYAR: Supabase > Project Settings > API =====
+const SUPABASE_URL='https://XXXX.supabase.co',SUPABASE_KEY='SENIN_ANON_PUBLIC_KEY';
+// ===================================================
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const $=id=>document.getElementById(id),fmt=n=>Math.round(n).toLocaleString('tr-TR')+' ₺',rnd=(a,b)=>a+Math.random()*(b-a),pick=a=>a[Math.floor(Math.random()*a.length)],cl=(x,a,b)=>Math.max(a,Math.min(b,x));
+// şehir: [x,y,nüfus ağırlığı]
+const CT={İstanbul:[126,75,10],Ankara:[288,135,7],İzmir:[48,217,6],Bursa:[129,120,4],Antalya:[197,300,5],Adana:[391,295,4],Konya:[273,247,4],Kayseri:[399,201,3],Samsun:[434,59,3],Trabzon:[577,75,3],Erzurum:[642,136,2],Diyarbakır:[598,246,3],Gaziantep:[478,291,3],Sivas:[463,144,2],Eskişehir:[189,142,2],Ordu:[499,76,2]};
+// Resim için: i yerine img yolu koyup render'da <img> kullan
+const V={sp:{n:'Mercedes Sprinter',s:16,p:75e4,f:12,c:0,i:'🚐'},man:{n:"MAN Lion's Coach",s:46,p:55e5,f:30,c:1,i:'🚌'},tou:{n:'Mercedes Tourismo',s:50,p:7e6,f:32,c:2,i:'🚌'},tra:{n:'Mercedes Travego 2+1',s:40,p:9e6,f:31,c:3,i:'🚍'}};
+const U={tesis:{n:'Dinlenme tesisi anlaşması',p:15e5,d:'Memnuniyet +10'},yakit:{n:'Akaryakıt anlaşması',p:8e5,d:'Yakıt gideri -%8'},atolye:{n:'Kendi bakım atölyesi',p:2e6,d:'Bakım gideri yarıya, yıpranma yavaşlar'},kargo:{n:'Kargo taşımacılığı',p:12e5,d:'Şehirlerarası seferlere ek gelir'},otel:{n:'Kendi dinlenme tesisin',p:4e6,d:'Memnuniyet +15, uzun hatlarda yolcu başı +10 ₺',need:()=>S.upg.tesis,nt:'Önce dinlenme tesisi anlaşması'},otogar:{n:'Kendi otogarın',p:12e6,d:'Talep +%10, peron başı +3.000 ₺/gün kira',need:()=>pc()>=3&&S.veh.length>=8,nt:'3 peron + 8 araç gerekir'}};
+const IK=[{n:'Yok',c:0},{n:'Su',c:5},{n:'Çay + kek',c:15},{n:'Tam ikram',c:35}];
+const MO=['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'],SZ=[.85,.85,.9,.95,1,1.2,1.3,1.3,1.1,1,.95,1];
+const NM=['Ahmet','Mehmet','Mustafa','Hasan','Ali','İbrahim','Yusuf','Kemal','Osman','Selim','Murat','Recep'];
+const EV=[{t:'🟡 Bir yolcu bagajının kaybolduğunu söylüyor.',o:[{l:'Tazminat öde',c:5000,s:2},{l:'Görmezden gel',c:0,s:-6}]},
+{t:'🟡 Rakip firma indirim kampanyası başlattı.',o:[{l:'Karşı kampanya',c:30000,s:0},{l:'Bekle (3 gün talep -%10)',c:0,s:0,b:1}]},
+{t:'❄️ Kar yağışı: seferler gecikiyor.',w:1,o:[{l:'Ekip ve zincir gönder',c:20000,s:0},{l:'Gecikmeyi kabul et',c:0,s:-8}]},
+{t:'🟢 Ünlü biri otobüsünüze bindi ve paylaştı! (+3 memnuniyet)',auto:1}];
+let user,S;
+const cand=()=>{const sf=Math.round(rnd(45,95)),fe=Math.round(rnd(45,95));return{id:S.nid++,n:pick(NM),sf,fe,sal:Math.round(1200+(sf+fe)*7)}};
+const newS=name=>({v:2,name,money:2e5,day:1,sat:60,fuel:50,ik:0,adv:0,loan:0,peron:{Samsun:1},upg:{},routes:{},fare:{},buff:null,ev:null,last:null,over:0,pool:[],nid:3,
+ veh:[{id:1,m:'sp',cond:100,km:0,route:'L-Samsun',dr:1},{id:2,m:'sp',cond:100,km:0,route:'L-Samsun',dr:2}],
+ drv:[{id:1,n:'Ahmet',sf:70,fe:65,sal:2000},{id:2,n:'Mehmet',sf:65,fe:70,sal:2000}],
+ riv:[{n:'Anadolu Turizm',v:8e6},{n:'Marmara Seyahat',v:15e6},{n:'Ege Turizm',v:5e6}],log:['Firma kuruldu! 2 minibüs, 2 şoför, Samsun peronu.']});
+const dr=v=>S.drv.find(d=>d.id==v.dr),val=v=>V[v.m].p*(.35+.4*v.cond/100),pc=()=>Object.keys(S.peron).length;
+const worth=()=>S.money-S.loan+S.veh.reduce((a,v)=>a+val(v),0)+Object.keys(S.peron).reduce((a,c)=>a+3e5*CT[c][2],0)+Object.keys(S.upg).reduce((a,k)=>a+U[k].p*.5,0);
+const dist=(a,b)=>Math.hypot(CT[a][0]-CT[b][0],CT[a][1]-CT[b][1])*2.3;
+function R(k){if(k[0]=='L'&&k[1]=='-'){const c=k.slice(2);return{k,n:c+' şehir içi',a:c,b:c,km:14,trips:6,ref:25,dem:60*CT[c][2],seat:0,loc:1}}
+ const[a,b]=k.split('-'),km=dist(a,b);return{k,n:a+' – '+b,a,b,km,trips:cl(Math.floor(18/(2*km/70+1.5)),1,6),ref:Math.max(40,km),dem:14*(CT[a][2]+CT[b][2]),seat:km<200?16:40}}
+const myRoutes=()=>[...Object.keys(S.peron).map(c=>'L-'+c),...Object.keys(S.routes)];
+const fare=r=>S.fare[r.k]??r.ref,mon=()=>Math.floor(((S.day-1)%360)/30),bay=()=>{const d=(S.day-1)%360;return(d>=100&&d<105)||(d>=250&&d<255)},season=()=>SZ[mon()]*(bay()?1.5:1);
+const demand=r=>r.dem*(.5+S.sat/100)*season()*(S.buff?S.buff.m:1)*(S.adv>0?1.1:1)*(S.upg.otogar?1.1:1)*(S.peron[r.a]&&S.peron[r.b]?1.15:1)*Math.pow(r.ref/fare(r),1.3);
+
+async function auth(up){$('err').textContent='';const email=$('em').value,password=$('pw').value;
+ const{data,error}=up?await sb.auth.signUp({email,password}):await sb.auth.signInWithPassword({email,password});
+ if(error)return $('err').textContent=error.message;if(!data.session)return $('err').textContent='E-postanı doğrula, sonra giriş yap.';user=data.user;load()}
+async function load(){const{data}=await sb.from('companies').select('state').eq('user_id',user.id).maybeSingle();
+ S=data&&data.state.v==2?data.state:newS((data&&data.name)||$('co').value||'Yeni Firma');
+ if(!S.pool.length)S.pool=[cand(),cand(),cand()];$('auth').hidden=true;$('game').hidden=false;render();save()}
+let tm;function save(){clearTimeout(tm);tm=setTimeout(()=>sb.from('companies').upsert({user_id:user.id,name:S.name,state:S,updated_at:new Date()}),600)}
+const act=f=>{f();save();render()};
+
+function tick1(){
+ const run=S.veh.filter(v=>v.route&&dr(v)&&v.cond>15),by={};run.forEach(v=>(by[v.route]??=[]).push(v));
+ let inc=0,fuel=0,toll=0,pax=0,short=0,cg=0;
+ for(const k in by){const r=R(k),vs=by[k],cap=vs.reduce((a,v)=>a+V[v.m].s*2*r.trips,0),dm=demand(r),p=Math.min(cap,Math.round(dm));
+  if(dm>cap)short=1;pax+=p;inc+=p*fare(r);if(S.upg.otel&&!r.loc&&r.km>250)inc+=p*10;
+  vs.forEach(v=>{const km=r.km*2*r.trips;fuel+=km*V[v.m].f/100*S.fuel*(1.15-dr(v).fe/400)*(S.upg.yakit?.92:1)*(1+(100-v.cond)/400);
+   if(!r.loc){toll+=km*.3;if(S.upg.kargo)cg+=km*3}v.km+=km;v.cond=cl(v.cond-km/(S.upg.atolye?900:500),0,100)})}
+ inc+=cg;const kira=S.upg.otogar?3000*pc():0;inc+=kira;
+ const per=S.drv.reduce((a,d)=>a+d.sal,0),mnt=S.veh.length*(S.upg.atolye?150:300),ik=pax*IK[S.ik].c,ter=pc()*1500,int=S.loan*.0015;
+ const exp=fuel+toll+per+mnt+ik+ter+int,n=run.length||1,comf=run.reduce((a,v)=>a+V[v.m].c,0)/n,cnd=run.reduce((a,v)=>a+v.cond,0)/n||100,sf=run.reduce((a,v)=>a+dr(v).sf,0)/n||60;
+ const tgt=35+S.ik*10+(S.upg.tesis?10:0)+(S.upg.otel?15:0)+comf*3+sf/10-short*6-(100-cnd)/8;
+ S.sat=cl(S.sat+(tgt-S.sat)*.2,0,100);S.money+=inc-exp;S.last={inc,fuel,toll,per,mnt,ik,ter,int,net:inc-exp,pax,kira,cg};
+ S.fuel=cl(S.fuel+rnd(-1.5,1.6),38,75);if(S.adv>0)S.adv--;if(S.buff&&--S.buff.d<=0)S.buff=null;
+ S.riv.forEach(r=>r.v*=1+rnd(.001,.006));S.day++;if(S.day%5==1)S.pool=[cand(),cand(),cand()];
+ S.log.unshift(`Gün ${S.day-1}: ${pax} yolcu, net ${fmt(inc-exp)}`);
+ if(Math.random()<.4)S.log.unshift('⭐ '+pick(S.sat>70?['"Otobüsler çok temiz, şoför güler yüzlüydü."','"İkramlar güzeldi, tavsiye ederim."']:S.sat>45?['"Fena değil ama bir tık geç kaldı."']:['"20 dakika geç kalktı."','"Bagajla hiç ilgilenmediler."']));
+ const bk=run.find(v=>Math.random()<(.015+(100-v.cond)/450)*(1.3-dr(v).sf/150));
+ if(bk)S.ev={t:`🔴 ${V[bk.m].i} ${V[bk.m].n} (${R(bk.route).n}) yolda arıza yaptı!`,fix:bk.id,o:[{l:'Tamir ekibi gönder',c:18000,s:-3},{l:'Yedek otobüs gönder',c:35000,s:0},{l:'Seferi iptal et',c:0,s:-12,loss:.35}]};
+ else if(Math.random()<.1){const e=pick(EV.filter(e=>!e.w||[10,11,0,1].includes(mon())));if(e.auto){S.sat=cl(S.sat+3,0,100);S.log.unshift(e.t)}else S.ev={...e}}
+ S.log=S.log.slice(0,40);if(S.money<-1e6)S.over=1}
+const tick=n=>act(()=>{for(let i=0;i<n&&!S.ev&&!S.over;i++)tick1()});
+const choose=i=>act(()=>{const o=S.ev.o[i];S.money-=o.c+(o.loss?o.loss*(S.last?S.last.inc:0):0);S.sat=cl(S.sat+o.s,0,100);if(o.b)S.buff={m:.9,d:3};
+ if(S.ev.fix&&o.c){const v=S.veh.find(v=>v.id==S.ev.fix);if(v)v.cond=cl(v.cond+15,0,100)}S.log.unshift('Karar: '+o.l);S.ev=null});
+const buy=(m,u)=>{const p=u?V[m].p*.55:V[m].p;if(S.money<p)return;act(()=>{S.money-=p;S.veh.push({id:S.nid++,m,cond:u?Math.round(rnd(45,70)):100,km:u?Math.round(rnd(150,400))*1000:0,route:'',dr:0});S.log.unshift('Alındı: '+V[m].n+(u?' (ikinci el)':''))})};
+const sell=id=>act(()=>{const v=S.veh.find(v=>v.id==id);S.money+=val(v);S.veh=S.veh.filter(x=>x!=v)});
+const fix=id=>act(()=>{const v=S.veh.find(v=>v.id==id),c=V[v.m].p*.06*(1-v.cond/100)*(S.upg.atolye?.5:1)+2000;if(S.money>=c){S.money-=c;v.cond=100}});
+const setV=(id,f,x)=>act(()=>{S.veh.find(v=>v.id==id)[f]=f=='dr'?+x:x});
+const hire=i=>act(()=>{if(S.money<5000)return;S.money-=5000;S.drv.push(S.pool.splice(i,1)[0])});
+const fire=id=>act(()=>{S.drv=S.drv.filter(d=>d.id!=id);S.veh.forEach(v=>{if(v.dr==id)v.dr=0})});
+const peron=c=>act(()=>{const p=3e5*CT[c][2];if(S.money>=p){S.money-=p;S.peron[c]=1;S.log.unshift('Peron alındı: '+c)}});
+const openR=()=>{const a=$('ra').value,b=$('rb').value,k=a+'-'+b,c=Math.round(dist(a,b)*1500);if(a==b||S.routes[k]||S.routes[b+'-'+a]||S.money<c)return;act(()=>{S.money-=c;S.routes[k]=1;S.log.unshift('Hat yetkisi: '+a+' – '+b)})};
+const prev=()=>{const a=$('ra').value,b=$('rb').value;$('pv').textContent=a==b?'':`${Math.round(dist(a,b))} km · yetki ${fmt(dist(a,b)*1500)}`};
+const setF=(k,x)=>act(()=>{S.fare[k]=Math.max(5,+x||R(k).ref)});
+const upg=k=>act(()=>{if(S.money>=U[k].p&&!S.upg[k]){S.money-=U[k].p;S.upg[k]=1}});
+const maxL=()=>Math.max(1e6,.4*worth()),borrow=()=>act(()=>{if(S.loan+5e5<=maxL()){S.loan+=5e5;S.money+=5e5}}),repay=()=>act(()=>{const x=Math.min(5e5,S.loan);if(S.money>=x)S.money-=x,S.loan-=x});
+const ad=()=>act(()=>{if(S.money>=5e4){S.money-=5e4;S.adv=7}}),setIk=x=>act(()=>{S.ik=+x});
+
+function map(){let s='<svg viewBox="0 0 700 330">';
+ Object.keys(S.routes).forEach(k=>{const r=R(k);s+=`<line x1="${CT[r.a][0]}" y1="${CT[r.a][1]}" x2="${CT[r.b][0]}" y2="${CT[r.b][1]}" stroke="#f59e0b" stroke-width="3"/>`});
+ for(const c in CT){const[x,y,p]=CT[c];s+=`<circle cx="${x}" cy="${y}" r="${4+p/2}" fill="${S.peron[c]?'#22c55e':'#64748b'}"/><text x="${x+9}" y="${y+4}" fill="#cbd5e1" font-size="11">${c}</text>`}return s+'</svg>'}
+function render(){const L=S.last,n=S.veh.length,lv=['Yeni Firma','Bölgesel Firma','Ulusal Firma','Büyük Firma','Sektör Lideri'][n<3?0:n<8?1:n<20?2:n<40?3:4];
+ const sel=(a,c)=>a.map(x=>`<option value="${x[0]}" ${x[0]==c?'selected':''}>${x[1]}</option>`).join(''),W=worth();
+ const rk=[...S.riv.map(r=>[r.n,r.v]),[S.name+' (sen)',W]].sort((a,b)=>b[1]-a[1]);
+ $('game').innerHTML=`
+ <div class="card"><div class="st"><span>🏢 ${S.name} · ${lv}</span><span>📅 ${MO[mon()]} · Gün ${S.day}${season()>1.1?' 🔥 yoğun sezon':''}${bay()?' 🎉 bayram':''}</span><span class="big" style="color:${S.money<0?'var(--bad)':'var(--ok)'}">${fmt(S.money)}</span>
+ <span>⭐ ${(1+4*S.sat/100).toFixed(1)}/5</span><span>⛽ ${S.fuel.toFixed(1)} ₺/L</span><span>💼 Değer ${fmt(W)}</span></div>
+ <p class="w"><button ${S.ev||S.over?'disabled':''} onclick="tick(1)">▶ Günü bitir</button><button ${S.ev||S.over?'disabled':''} onclick="tick(7)">▶▶ 7 gün</button><button onclick="sb.auth.signOut().then(()=>location.reload())" style="background:#475569;color:#fff">Çıkış</button></p></div>
+ ${S.over?`<div class="card ev"><h3>💥 İflas!</h3><p>Borç sınırını aştın.</p><button onclick="act(()=>{S=newS(S.name);S.pool=[cand(),cand(),cand()]})">Yeniden başla</button></div>`:''}
+ ${S.ev?`<div class="card ev"><h3>${S.ev.t}</h3><div class="w">${S.ev.o.map((o,i)=>`<button onclick="choose(${i})">${o.l}${o.c?' · '+fmt(o.c):''}${o.loss?' · gelir kaybı':''}</button>`).join('')}</div></div>`:''}
+ <div class="card"><h3>🗺️ Harita</h3>${map()}</div>
+ ${L?`<div class="card"><h3>🧾 Son gün raporu</h3><small>${L.pax} yolcu · Gelir ${fmt(L.inc)} (kargo ${fmt(L.cg)}, kira ${fmt(L.kira)}) · Yakıt -${fmt(L.fuel)} · Otoyol -${fmt(L.toll)} · Personel -${fmt(L.per)} · Bakım -${fmt(L.mnt)} · İkram -${fmt(L.ik)} · Terminal -${fmt(L.ter)} · Faiz -${fmt(L.int)}</small><br><b style="color:${L.net<0?'var(--bad)':'var(--ok)'}">Net ${fmt(L.net)}</b></div>`:''}
+ <div class="card"><h3>🛣️ Hatlar & bilet fiyatı</h3>${myRoutes().map(k=>{const r=R(k);return`<div class="row"><span>${r.n} <small>${Math.round(r.km)} km · ${r.trips} sefer/gün · tahmini talep ${Math.round(demand(r))}</small></span><span>Bilet <input type="number" style="width:80px" value="${Math.round(fare(r))}" onchange="setF('${k}',this.value)"> ₺</span></div>`}).join('')}
+ <p class="w"><select id="ra" onchange="prev()">${sel(Object.keys(S.peron).map(c=>[c,c+' (peronlu)']))}</select>→<select id="rb" onchange="prev()">${sel(Object.keys(CT).map(c=>[c,c]),'Ankara')}</select><button onclick="openR()">Hat yetkisi al</button><small id="pv"></small></p></div>
+ <div class="card"><h3>🚌 Garaj</h3>${S.veh.map(v=>`<div class="row"><span>${V[v.m].i} ${V[v.m].n} <small>%${Math.round(v.cond)} durum · ${Math.round(v.km/1000)} bin km</small></span><span class="w">
+ <select onchange="setV(${v.id},'route',this.value)"><option value="">Boşta</option>${sel(myRoutes().filter(k=>V[v.m].s>=R(k).seat).map(k=>[k,R(k).n]),v.route)}</select>
+ <select onchange="setV(${v.id},'dr',this.value)"><option value="0">Şoför yok</option>${sel(S.drv.filter(d=>d.id==v.dr||!S.veh.some(x=>x.dr==d.id)).map(d=>[d.id,d.n]),v.dr)}</select>
+ <button onclick="fix(${v.id})">Bakım</button><button onclick="sell(${v.id})" style="background:#475569;color:#fff">Sat ${fmt(val(v))}</button></span></div>`).join('')}</div>
+ <div class="card"><h3>🛒 Araç pazarı</h3>${Object.entries(V).map(([k,v])=>`<div class="row"><span>${v.i} ${v.n} · ${v.s} koltuk · konfor ${v.c}</span><span class="w"><button ${S.money<v.p?'disabled':''} onclick="buy('${k}',0)">Sıfır ${fmt(v.p)}</button><button ${S.money<v.p*.55?'disabled':''} onclick="buy('${k}',1)">İkinci el ${fmt(v.p*.55)}</button></span></div>`).join('')}</div>
+ <div class="card"><h3>👨‍✈️ Şoförler & ikram</h3>${S.drv.map(d=>`<div class="row"><span>${d.n} <small>Güvenlik ${d.sf} · Yakıt ekonomisi ${d.fe} · ${fmt(d.sal)}/gün</small></span><button onclick="fire(${d.id})" style="background:#475569;color:#fff">Çıkar</button></div>`).join('')}
+ <p><b>Adaylar</b> (5.000 ₺ işe alım)</p>${S.pool.map((d,i)=>`<div class="row"><span>${d.n} <small>G${d.sf} · Y${d.fe} · ${fmt(d.sal)}/gün</small></span><button ${S.money<5000?'disabled':''} onclick="hire(${i})">İşe al</button></div>`).join('')}
+ <div class="row"><span>İkram (yolcu başı)</span><select onchange="setIk(this.value)">${IK.map((x,i)=>`<option value="${i}" ${S.ik==i?'selected':''}>${x.n} (${x.c} ₺)</option>`).join('')}</select></div></div>
+ <div class="card"><h3>🏙️ Peron / şube</h3><div class="w">${Object.keys(CT).filter(c=>!S.peron[c]).map(c=>`<button ${S.money<3e5*CT[c][2]?'disabled':''} onclick="peron('${c}')">${c} ${fmt(3e5*CT[c][2])}</button>`).join('')||'Hepsi senin!'}</div><small>Peron, şehir içi hattı açar; hat yetkisi için başlangıç şehrinde peron gerekir.</small></div>
+ <div class="card"><h3>🏗️ Yatırımlar</h3>${Object.entries(U).map(([k,u])=>{const lock=u.need&&!u.need();return`<div class="row"><span>${u.n} · ${fmt(u.p)}<br><small>${u.d}${lock?' · 🔒 '+u.nt:''}</small></span><button ${S.upg[k]||lock||S.money<u.p?'disabled':''} onclick="upg('${k}')">${S.upg[k]?'Alındı':'Satın al'}</button></div>`}).join('')}</div>
+ <div class="card"><h3>💰 Finans & reklam</h3><div class="row"><span>Borç: ${fmt(S.loan)} <small>(limit ${fmt(maxL())}, günlük %0,15 faiz)</small></span><span class="w"><button onclick="borrow()">+500.000 ₺ kredi</button><button onclick="repay()">Öde</button></span></div>
+ <div class="row"><span>Reklam kampanyası <small>${S.adv>0?S.adv+' gün kaldı':'talep +%10, 7 gün'}</small></span><button ${S.money<5e4?'disabled':''} onclick="ad()">50.000 ₺</button></div></div>
+ <div class="card"><h3>🏆 Sektör sıralaması</h3>${rk.map((r,i)=>`<div class="row"><span>${i+1}. ${r[0]}</span><span>${fmt(r[1])}</span></div>`).join('')}</div>
+ <div class="card"><h3>📜 Günlük & yorumlar</h3><div id="log">${S.log.map(l=>`<div>${l}</div>`).join('')}</div></div>`;prev()}
+sb.auth.getSession().then(({data})=>{if(data.session){user=data.session.user;load()}});
+</script></body></html>

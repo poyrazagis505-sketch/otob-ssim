@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Türkiye Otobüs Tycoon - Aganiga Edition</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Leaflet.js Harita Kütüphanesi -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans h-screen flex flex-col overflow-hidden">
+
+    <!-- Üst Bilgi Barı (Navbar) -->
+    <header class="bg-slate-800 border-b border-slate-700 px-6 py-3 flex justify-between items-center shadow-md z-50">
+        <div class="flex items-center space-x-3">
+            <span class="text-2xl">🚌</span>
+            <h1 class="text-xl font-bold tracking-wide text-amber-400">Anadolu Seyahat Tycoon</h1>
+        </div>
+        <div class="flex items-center space-x-6 text-sm">
+            <div class="bg-slate-700 px-4 py-1.5 rounded-full border border-slate-600">
+                Şirket: <span id="company-name" class="font-semibold text-emerald-400">Aganiga Turizm</span>
+            </div>
+            <div class="bg-slate-700 px-4 py-1.5 rounded-full border border-slate-600">
+                Kasa: <span id="company-cash" class="font-semibold text-emerald-400">150.000 ₺</span>
+            </div>
+            <div class="bg-slate-700 px-4 py-1.5 rounded-full border border-slate-600">
+                Prestij: ⭐ <span id="company-prestige" class="font-semibold text-amber-400">10</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Ana Oyun Alanı -->
+    <div class="flex flex-1 overflow-hidden">
+        
+        <!-- Sol Panel: Kontrol ve Yönetim Sekmeleri -->
+        <aside class="w-1/3 bg-slate-800 border-r border-slate-700 flex flex-col">
+            <div class="flex border-b border-slate-700 text-sm font-medium">
+                <button onclick="switchTab('fleet')" id="btn-fleet" class="flex-1 py-3 text-center bg-slate-700 text-amber-400 border-b-2 border-amber-400 transition">Filo & Araçlar</button>
+                <button onclick="switchTab('routes')" id="btn-routes" class="flex-1 py-3 text-center text-slate-400 hover:text-slate-200 transition">Hatlar</button>
+                <button onclick="switchTab('events')" id="btn-events" class="flex-1 py-3 text-center text-slate-400 hover:text-slate-200 transition">Olaylar & Kararlar</button>
+            </div>
+
+            <!-- Sekme İçerikleri -->
+            <div class="p-4 flex-1 overflow-y-auto space-y-4" id="tab-content">
+                <!-- Filo Sekmesi İçeriği -->
+                <div id="content-fleet" class="space-y-3">
+                    <h2 class="text-md font-bold text-slate-300">Aktif Minibüs ve Otobüsler</h2>
+                    <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-3 flex justify-between items-center">
+                        <div>
+                            <p class="font-bold text-amber-300">Karsan J9 (Emektar)</p>
+                            <p class="text-xs text-slate-400">Plaka: 06 AGS 01 | Durum: Şehir İçi Hat</p>
+                        </div>
+                        <span class="text-xs bg-emerald-500/20 text-emerald-400 px-2.5 py-1 rounded-full border border-emerald-500/30">Yolda</span>
+                    </div>
+                    <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-3 flex justify-between items-center">
+                        <div>
+                            <p class="font-bold text-amber-300">Otokar Sultan</p>
+                            <p class="text-xs text-slate-400">Plaka: 06 AGS 02 | Durum: Garajda Bekliyor</p>
+                        </div>
+                        <span class="text-xs bg-amber-500/20 text-amber-400 px-2.5 py-1 rounded-full border border-amber-500/30">Boşta</span>
+                    </div>
+                    <button class="w-full mt-4 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-2 rounded-lg transition shadow-lg">
+                        + Galeriye Git / Yeni Araç Al
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Sağ Alan: İnteraktif Türkiye Haritası -->
+        <main class="flex-1 relative bg-slate-950">
+            <div id="map" class="w-full h-full z-10"></div>
+        </main>
+
+    </div>
+
+    <!-- Oyun Script Bağlantısı -->
+    <script>
+        // Harita Başlatma (Türkiye Odaklı)
+        var map = L.map('map').setView([39.1667, 35.6667], 6); // Türkiye merkezi
+        
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap & CartoDB',
+            subdomains: 'abcd',
+            maxZoom: 12,
+            minZoom: 5
+        }).addTo(map);
+
+        // Sekme Değiştirme Fonksiyonu
+        function switchTab(tabName) {
+            document.getElementById('content-fleet').style.display = tabName === 'fleet' ? 'block' : 'none';
+            // Diğer sekmeler buraya eklenecek
+        }
+    </script>
+</body>
+</html>

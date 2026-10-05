@@ -3,94 +3,416 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Türkiye Otobüs Tycoon - Aganiga Edition</title>
+    <title>Anadolu Seyahat Tycoon - Ultimate Aganiga Edition</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Leaflet.js Harita Kütüphanesi -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body class="bg-slate-900 text-slate-100 font-sans h-screen flex flex-col overflow-hidden">
+<body class="bg-slate-900 text-slate-100 font-sans h-screen flex flex-col overflow-hidden selection:bg-amber-500 selection:text-slate-950">
 
     <!-- Üst Bilgi Barı (Navbar) -->
     <header class="bg-slate-800 border-b border-slate-700 px-6 py-3 flex justify-between items-center shadow-md z-50">
         <div class="flex items-center space-x-3">
-            <span class="text-2xl">🚌</span>
-            <h1 class="text-xl font-bold tracking-wide text-amber-400">Anadolu Seyahat Tycoon</h1>
+            <span class="text-2xl animate-pulse">🚌</span>
+            <h1 class="text-xl font-bold tracking-wide text-amber-400">Anadolu Seyahat Tycoon <span class="text-xs bg-amber-500/10 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded ml-2">v1.0 Ultimate</span></h1>
         </div>
-        <div class="flex items-center space-x-6 text-sm">
-            <div class="bg-slate-700 px-4 py-1.5 rounded-full border border-slate-600">
-                Şirket: <span id="company-name" class="font-semibold text-emerald-400">Aganiga Turizm</span>
+        <div class="flex items-center space-x-3 text-sm">
+            <div class="bg-slate-700/80 px-3 py-1.5 rounded-full border border-slate-600 flex items-center space-x-2">
+                <span class="text-slate-400 text-xs">Şirket:</span>
+                <span id="company-name" class="font-semibold text-amber-300">Aganiga Turizm</span>
             </div>
-            <div class="bg-slate-700 px-4 py-1.5 rounded-full border border-slate-600">
-                Kasa: <span id="company-cash" class="font-semibold text-emerald-400">150.000 ₺</span>
+            <div class="bg-slate-700/80 px-3 py-1.5 rounded-full border border-slate-600 flex items-center space-x-2">
+                <span class="text-slate-400 text-xs">Kasa:</span>
+                <span id="company-cash" class="font-semibold text-emerald-400">150.000 ₺</span>
             </div>
-            <div class="bg-slate-700 px-4 py-1.5 rounded-full border border-slate-600">
-                Prestij: ⭐ <span id="company-prestige" class="font-semibold text-amber-400">10</span>
+            <div class="bg-slate-700/80 px-3 py-1.5 rounded-full border border-slate-600 flex items-center space-x-2">
+                <span class="text-slate-400 text-xs">Prestij:</span>
+                <span id="company-prestige" class="font-semibold text-amber-400">⭐ 10</span>
+            </div>
+            <div class="bg-slate-700/80 px-3 py-1.5 rounded-full border border-slate-600 flex items-center space-x-2">
+                <span class="text-slate-400 text-xs">Mazot:</span>
+                <span id="fuel-price" class="font-semibold text-rose-400">42.50 ₺/L</span>
             </div>
         </div>
     </header>
 
-    <!-- Ana Oyun Alanı -->
+    <!-- Ana Oyun Ekranı -->
     <div class="flex flex-1 overflow-hidden">
         
-        <!-- Sol Panel: Kontrol ve Yönetim Sekmeleri -->
-        <aside class="w-1/3 bg-slate-800 border-r border-slate-700 flex flex-col">
-            <div class="flex border-b border-slate-700 text-sm font-medium">
-                <button onclick="switchTab('fleet')" id="btn-fleet" class="flex-1 py-3 text-center bg-slate-700 text-amber-400 border-b-2 border-amber-400 transition">Filo & Araçlar</button>
-                <button onclick="switchTab('routes')" id="btn-routes" class="flex-1 py-3 text-center text-slate-400 hover:text-slate-200 transition">Hatlar</button>
-                <button onclick="switchTab('events')" id="btn-events" class="flex-1 py-3 text-center text-slate-400 hover:text-slate-200 transition">Olaylar & Kararlar</button>
+        <!-- Sol Panel: Yönetim Menüleri -->
+        <aside class="w-2/5 lg:w-1/3 bg-slate-800 border-r border-slate-700 flex flex-col z-20 shadow-xl">
+            <!-- Sekme Butonları -->
+            <div class="grid grid-cols-4 border-b border-slate-700 text-[11px] font-semibold bg-slate-850">
+                <button onclick="switchTab('fleet')" id="tab-btn-fleet" class="py-3 px-1 text-center bg-slate-700 text-amber-400 border-b-2 border-amber-400 transition cursor-pointer">Filo & Galeri</button>
+                <button onclick="switchTab('routes')" id="tab-btn-routes" class="py-3 px-1 text-center text-slate-400 hover:text-slate-200 transition cursor-pointer">Hatlar</button>
+                <button onclick="switchTab('terminals')" id="tab-btn-terminals" class="py-3 px-1 text-center text-slate-400 hover:text-slate-200 transition cursor-pointer">Peron & Tesis</button>
+                <button onclick="switchTab('events')" id="tab-btn-events" class="py-3 px-1 text-center text-slate-400 hover:text-slate-200 transition cursor-pointer">Kriz & Late Game</button>
             </div>
 
             <!-- Sekme İçerikleri -->
-            <div class="p-4 flex-1 overflow-y-auto space-y-4" id="tab-content">
-                <!-- Filo Sekmesi İçeriği -->
-                <div id="content-fleet" class="space-y-3">
-                    <h2 class="text-md font-bold text-slate-300">Aktif Minibüs ve Otobüsler</h2>
-                    <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-3 flex justify-between items-center">
-                        <div>
-                            <p class="font-bold text-amber-300">Karsan J9 (Emektar)</p>
-                            <p class="text-xs text-slate-400">Plaka: 06 AGS 01 | Durum: Şehir İçi Hat</p>
-                        </div>
-                        <span class="text-xs bg-emerald-500/20 text-emerald-400 px-2.5 py-1 rounded-full border border-emerald-500/30">Yolda</span>
+            <div class="p-4 flex-1 overflow-y-auto space-y-4">
+                
+                <!-- 1. FİLO & GALERİ -->
+                <div id="content-fleet" class="tab-content space-y-3">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300">Aktif Filo</h2>
+                        <span id="bus-count" class="text-xs bg-slate-700 text-slate-300 px-2 py-0.5 rounded-full">2 Araç</span>
                     </div>
-                    <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-3 flex justify-between items-center">
-                        <div>
-                            <p class="font-bold text-amber-300">Otokar Sultan</p>
-                            <p class="text-xs text-slate-400">Plaka: 06 AGS 02 | Durum: Garajda Bekliyor</p>
+
+                    <div id="fleet-list" class="space-y-2">
+                        <div class="bg-slate-700/40 border border-slate-600/60 rounded-xl p-3 flex justify-between items-center shadow">
+                            <div>
+                                <p class="font-bold text-amber-300 text-xs">Karsan J9 (Emektar)</p>
+                                <p class="text-[10px] text-slate-400">Plaka: 06 AGS 1923 | Durum: Şehir İçi</p>
+                            </div>
+                            <span class="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30 font-medium">Yolda</span>
                         </div>
-                        <span class="text-xs bg-amber-500/20 text-amber-400 px-2.5 py-1 rounded-full border border-amber-500/30">Boşta</span>
+                        <div class="bg-slate-700/40 border border-slate-600/60 rounded-xl p-3 flex justify-between items-center shadow">
+                            <div>
+                                <p class="font-bold text-amber-300 text-xs">Otokar Sultan</p>
+                                <p class="text-[10px] text-slate-400">Plaka: 06 AGS 07 | Durum: Garajda</p>
+                            </div>
+                            <span class="text-[10px] bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30 font-medium">Boşta</span>
+                        </div>
                     </div>
-                    <button class="w-full mt-4 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-2 rounded-lg transition shadow-lg">
-                        + Galeriye Git / Yeni Araç Al
+
+                    <!-- Otobüs Galerisi -->
+                    <div class="bg-slate-700/30 border border-slate-600 rounded-xl p-3 space-y-2 mt-3">
+                        <h3 class="text-xs font-bold text-amber-400 uppercase">Otobüs Galerisi (Araç Al)</h3>
+                        <div class="space-y-1.5">
+                            <button onclick="buySpecificBus('Karsan J9 Minibüs', 45000, 15)" class="w-full bg-slate-700 hover:bg-slate-600 text-left p-2 rounded-lg text-xs flex justify-between items-center cursor-pointer border border-slate-600">
+                                <div><p class="font-bold text-slate-200">Karsan J9</p><p class="text-[9px] text-slate-400">15 Yolcu | Şehir İçi Uzmanı</p></div>
+                                <span class="text-amber-400 font-bold">45.000 ₺</span>
+                            </button>
+                            <button onclick="buySpecificBus('Otokar Sultan', 85000, 27)" class="w-full bg-slate-700 hover:bg-slate-600 text-left p-2 rounded-lg text-xs flex justify-between items-center cursor-pointer border border-slate-600">
+                                <div><p class="font-bold text-slate-200">Otokar Sultan</p><p class="text-[9px] text-slate-400">27 Yolcu | Bölgesel Hatlar</p></div>
+                                <span class="text-amber-400 font-bold">85.000 ₺</span>
+                            </button>
+                            <button onclick="buySpecificBus('Mercedes Travego 15 SHD', 220000, 46)" class="w-full bg-slate-700 hover:bg-slate-600 text-left p-2 rounded-lg text-xs flex justify-between items-center cursor-pointer border border-slate-600">
+                                <div><p class="font-bold text-slate-200">Mercedes Travego</p><p class="text-[9px] text-slate-400">46 Yolcu | Amiral Gemisi</p></div>
+                                <span class="text-amber-400 font-bold">220.000 ₺</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. HATLAR VE SEFERLER -->
+                <div id="content-routes" class="tab-content space-y-3" style="display: none;">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300">Hat Yönetimi</h2>
+                    
+                    <div id="routes-list" class="space-y-2">
+                        <div class="bg-slate-700/40 border border-slate-600/60 rounded-xl p-3 space-y-1 shadow">
+                            <div class="flex justify-between items-center">
+                                <span class="font-bold text-slate-200 text-xs">Kızılay ↔ Çankaya</span>
+                                <span class="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded border border-blue-500/30">Şehir İçi</span>
+                            </div>
+                            <p class="text-[10px] text-emerald-400 font-medium">Günlük Hasılat: +4.250 ₺</p>
+                        </div>
+                    </div>
+
+                    <!-- Yeni Hat Kurma Formu -->
+                    <div class="bg-slate-700/30 border border-slate-600 rounded-xl p-3 space-y-2">
+                        <h3 class="text-xs font-bold text-amber-400 uppercase">Şehirlerarası Hat Kur</h3>
+                        <div class="grid grid-cols-2 gap-2">
+                            <select id="route-from" class="bg-slate-700 border border-slate-600 rounded p-1.5 text-[11px] text-slate-200">
+                                <option value="Ankara">Ankara</option>
+                                <option value="İstanbul">İstanbul</option>
+                                <option value="İzmir">İzmir</option>
+                                <option value="Antalya">Antalya</option>
+                                <option value="Trabzon">Trabzon</option>
+                                <option value="Van">Van</option>
+                            </select>
+                            <select id="route-to" class="bg-slate-700 border border-slate-600 rounded p-1.5 text-[11px] text-slate-200">
+                                <option value="İstanbul">İstanbul</option>
+                                <option value="Ankara">Ankara</option>
+                                <option value="İzmir" selected>İzmir</option>
+                                <option value="Antalya">Antalya</option>
+                                <option value="Trabzon">Trabzon</option>
+                                <option value="Van">Van</option>
+                            </select>
+                        </div>
+                        <button onclick="createNewRoute()" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-2 rounded-lg text-xs transition cursor-pointer shadow">
+                            Hat Aç ve Sefer Başlat (25.000 ₺)
+                        </button>
+                    </div>
+
+                    <button onclick="collectRevenue()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl transition shadow-lg text-xs cursor-pointer flex items-center justify-center space-x-2">
+                        <span>💰 Hasılatları Topla</span>
                     </button>
                 </div>
+
+                <!-- 3. PERON & TESİS -->
+                <div id="content-terminals" class="tab-content space-y-3" style="display: none;">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300">Otogar Peron & Tesisler</h2>
+                    
+                    <div class="space-y-2">
+                        <div class="bg-slate-700/40 border border-slate-600/60 rounded-xl p-3 flex justify-between items-center shadow">
+                            <div>
+                                <p class="font-bold text-amber-300 text-xs">Ankara AŞTİ (Peron #12)</p>
+                                <p class="text-[10px] text-emerald-400">Merkez Peron (Aktif)</p>
+                            </div>
+                            <span class="text-[10px] text-slate-400">Sahip Olunan</span>
+                        </div>
+                        <div class="bg-slate-700/40 border border-slate-600/60 rounded-xl p-3 flex justify-between items-center shadow">
+                            <div>
+                                <p class="font-bold text-slate-200 text-xs">İstanbul Alibeyköy Peronu</p>
+                                <p class="text-[10px] text-slate-400">Kira Bedeli: 50.000 ₺</p>
+                            </div>
+                            <button onclick="rentTerminal('İstanbul', 50000)" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[11px] px-2.5 py-1 rounded-lg cursor-pointer">Kirala</button>
+                        </div>
+                    </div>
+
+                    <!-- Dinlenme Tesisleri -->
+                    <div class="bg-slate-700/30 border border-slate-600 rounded-xl p-3 space-y-2 mt-3">
+                        <h3 class="text-xs font-bold text-amber-400 uppercase">Dinlenme Tesisi Anlaşması</h3>
+                        <p class="text-[10px] text-slate-400">Yol güzergahındaki tesisle anlaşarak çay/komisyon geliri sağla.</p>
+                        <button onclick="signRestFacility()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-1.5 rounded-lg text-xs transition cursor-pointer">
+                            Bolu Dağı Tesisleri ile Anlaş (30.000 ₺)
+                        </button>
+                    </div>
+
+                    <!-- İkram Politikası -->
+                    <div class="space-y-1 pt-1">
+                        <label class="block text-[11px] font-medium text-slate-300">İkram Politikası:</label>
+                        <select id="snack-select" onchange="updateSnacks()" class="w-full bg-slate-700 border border-slate-600 rounded p-1.5 text-[11px] text-slate-200">
+                            <option value="cheap">Ucuz Kek & Su (Maliyet Düşük, Prestij -1)</option>
+                            <option value="standard" selected>Markalı Kek & Meyve Suyu (Dengeli)</option>
+                            <option value="luxury">Sıcak Kahve & Gourmet Kurabiye (Maliyet Yüksek, Prestij +3)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 4. KRİZ & LATE GAME -->
+                <div id="content-events" class="tab-content space-y-3" style="display: none;">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300">Kriz Masası & Etkinlikler</h2>
+                    
+                    <div id="event-card" class="bg-amber-950/30 border border-amber-600/40 rounded-xl p-3 space-y-2 shadow-lg">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-base">📢</span>
+                            <p class="text-[11px] font-bold text-amber-400 uppercase">Yolcu & Muavin Krizi!</p>
+                        </div>
+                        <p class="text-[11px] text-slate-300 leading-relaxed">Muavinin bilet üstünü eksik verdiğini iddia eden sinirli yolcu kavga çıkardı!</p>
+                        <div class="grid grid-cols-2 gap-2 pt-1">
+                            <button onclick="resolveEvent('pay')" class="bg-red-600/80 hover:bg-red-600 text-[10px] text-white py-1.5 rounded-lg transition text-center cursor-pointer">Parayı İade Et (-500 ₺)</button>
+                            <button onclick="resolveEvent('ignore')" class="bg-slate-700 hover:bg-slate-600 text-[10px] text-white py-1.5 rounded-lg transition text-center cursor-pointer">Muavini Savun (-2 Prestij)</button>
+                        </div>
+                    </div>
+
+                    <!-- Late Game: Özel Tahsisler -->
+                    <div class="bg-slate-700/30 border border-slate-600 rounded-xl p-3 space-y-2 mt-3">
+                        <h3 class="text-xs font-bold text-amber-400 uppercase">Late Game: Özel Organizasyon</h3>
+                        <p class="text-[10px] text-slate-400">Filodaki bir otobüsü Süper Lig deplasman maçına veya yaz festivaline özel tahsis et.</p>
+                        <button onclick="specialCharter()" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 rounded-lg text-xs transition cursor-pointer shadow">
+                            Özel Tahsis Seferi Düzenle (+35.000 ₺)
+                        </button>
+                    </div>
+                </div>
+
             </div>
         </aside>
 
-        <!-- Sağ Alan: İnteraktif Türkiye Haritası -->
+        <!-- Sağ Alan: Türkiye İnteraktif Haritası -->
         <main class="flex-1 relative bg-slate-950">
             <div id="map" class="w-full h-full z-10"></div>
         </main>
 
     </div>
 
-    <!-- Oyun Script Bağlantısı -->
+    <!-- Oyun Script Mantığı -->
     <script>
-        // Harita Başlatma (Türkiye Odaklı)
-        var map = L.map('map').setView([39.1667, 35.6667], 6); // Türkiye merkezi
-        
+        let playerState = {
+            cash: 150000,
+            prestige: 10,
+            companyName: "Aganiga Turizm",
+            busCount: 2,
+            fuelPrice: 42.50,
+            hasRestFacility: false
+        };
+
+        // Kapsamlı İl Koordinatları (Türkiye Haritası)
+        const cityCoords = {
+            "Ankara": [39.9334, 32.8597],
+            "İstanbul": [41.0082, 28.9784],
+            "İzmir": [38.4192, 27.1287],
+            "Antalya": [36.8969, 30.7133],
+            "Trabzon": [41.0015, 39.7178],
+            "Van": [38.4891, 43.4089]
+        };
+
+        // Leaflet Harita Başlatma
+        const map = L.map('map', { zoomControl: false }).setView([39.1667, 35.6667], 6);
+
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; OpenStreetMap & CartoDB',
+            attribution: '&copy; CARTO',
             subdomains: 'abcd',
             maxZoom: 12,
             minZoom: 5
         }).addTo(map);
 
-        // Sekme Değiştirme Fonksiyonu
+        L.control.zoom({ position: 'topright' }).addTo(map);
+
+        const terminalIcon = L.divIcon({
+            className: 'custom-div-icon',
+            html: "<div style='background-color:#f59e0b; width:12px; height:12px; border-radius:50%; border:3px solid #0f172a; box-shadow: 0 0 10px #f59e0b;'></div>",
+            iconSize: [12, 12],
+            iconAnchor: [6, 6]
+        });
+
+        // Tüm şehir terminallerini haritaya ekle
+        for (let cityName in cityCoords) {
+            L.marker(cityCoords[cityName], {icon: terminalIcon}).addTo(map)
+              .bindPopup(`<div style='color:#0f172a; font-weight:bold;'>${cityName} Otogarı</div>`);
+        }
+
+        // Sekme Değiştirme
         function switchTab(tabName) {
-            document.getElementById('content-fleet').style.display = tabName === 'fleet' ? 'block' : 'none';
-            // Diğer sekmeler buraya eklenecek
+            document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('[id^="tab-btn-"]').forEach(el => {
+                el.classList.remove('bg-slate-700', 'text-amber-400', 'border-b-2', 'border-amber-400');
+                el.classList.add('text-slate-400');
+            });
+            
+            document.getElementById('content-' + tabName).style.display = 'block';
+            const activeBtn = document.getElementById('tab-btn-' + tabName);
+            activeBtn.classList.add('bg-slate-700', 'text-amber-400', 'border-b-2', 'border-amber-400');
+            activeBtn.classList.remove('text-slate-400');
+        }
+
+        function updateUI() {
+            document.getElementById('company-cash').innerText = playerState.cash.toLocaleString() + ' ₺';
+            document.getElementById('company-prestige').innerText = '⭐ ' + playerState.prestige;
+            document.getElementById('bus-count').innerText = playerState.busCount + ' Araç';
+            document.getElementById('fuel-price').innerText = playerState.fuelPrice.toFixed(2) + ' ₺/L';
+        }
+
+        function buySpecificBus(modelName, price, capacity) {
+            if (playerState.cash >= price) {
+                playerState.cash -= price;
+                playerState.busCount += 1;
+                playerState.prestige += 1;
+                updateUI();
+
+                const fleetList = document.getElementById('fleet-list');
+                const newBusCard = document.createElement('div');
+                newBusCard.className = "bg-slate-700/40 border border-slate-600/60 rounded-xl p-3 flex justify-between items-center shadow";
+                newBusCard.innerHTML = `
+                    <div>
+                        <p class="font-bold text-amber-300 text-xs">${modelName}</p>
+                        <p class="text-[10px] text-slate-400">Plaka: 06 AGS ${Math.floor(10 + Math.random() * 89)} | ${capacity} Koltuk</p>
+                    </div>
+                    <span class="text-[10px] bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30 font-medium">Boşta</span>
+                `;
+                fleetList.appendChild(newBusCard);
+                alert(`Tebrikler aganiga! Galeriden ${modelName} filoya eklendi.`);
+            } else {
+                alert("Kasada yeterli nakit yok aganiga!");
+            }
+        }
+
+        function createNewRoute() {
+            let fromCity = document.getElementById('route-from').value;
+            let toCity = document.getElementById('route-to').value;
+            let cost = 25000;
+
+            if (fromCity === toCity) {
+                alert("Kalkış ve varış noktası aynı olamaz aganiga!");
+                return;
+            }
+
+            if (playerState.cash >= cost) {
+                playerState.cash -= cost;
+                playerState.prestige += 2;
+                updateUI();
+
+                let latlngs = [cityCoords[fromCity], cityCoords[toCity]];
+                L.polyline(latlngs, {color: '#f59e0b', weight: 4, opacity: 0.8, dashArray: '5, 10'}).addTo(map);
+
+                let routesList = document.getElementById('routes-list');
+                let newRouteDiv = document.createElement('div');
+                newRouteDiv.className = "bg-slate-700/40 border border-slate-600/60 rounded-xl p-3 space-y-1 shadow";
+                newRouteDiv.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <span class="font-bold text-slate-200 text-xs uppercase">${fromCity} ↔ ${toCity}</span>
+                        <span class="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded border border-amber-500/30">Şehirlerarası</span>
+                    </div>
+                    <p class="text-[10px] text-emerald-400 font-medium">Günlük Hasılat: +12.500 ₺</p>
+                `;
+                routesList.appendChild(newRouteDiv);
+
+                alert(`${fromCity} - ${toCity} hattı başarıyla kuruldu ve haritada çizildi!`);
+            } else {
+                alert("Yeni hat kurmak için 25.000 ₺ gerekiyor aganiga!");
+            }
+        }
+
+        function rentTerminal(cityName, price) {
+            if (playerState.cash >= price) {
+                playerState.cash -= price;
+                playerState.prestige += 4;
+                updateUI();
+                alert(`${cityName} otogarından peron kiralandı! Prestij arttı.`);
+            } else {
+                alert("Yeterli paran yok aganiga!");
+            }
+        }
+
+        function signRestFacility() {
+            if (playerState.hasRestFacility) {
+                alert("Zaten bir dinlenme tesisi anlaşman var aganiga!");
+                return;
+            }
+            if (playerState.cash >= 30000) {
+                playerState.cash -= 30000;
+                playerState.hasRestFacility = true;
+                playerState.prestige += 3;
+                updateUI();
+                alert("Bolu Dağı Tesisleri ile komisyon anlaşması imzalandı! Yolcu memnuniyeti ve gelirler arttı.");
+            } else {
+                alert("Tesisle anlaşmak için yeterli nakit yok!");
+            }
+        }
+
+        function updateSnacks() {
+            let select = document.getElementById('snack-select').value;
+            if(select === 'luxury') {
+                playerState.prestige += 2;
+                playerState.cash -= 1500;
+            } else if(select === 'cheap') {
+                playerState.prestige -= 1;
+            }
+            updateUI();
+        }
+
+        function collectRevenue() {
+            let bonusMultiplier = playerState.hasRestFacility ? 1.3 : 1.0;
+            let earnings = Math.round(playerState.busCount * 4500 * bonusMultiplier);
+            playerState.cash += earnings;
+            updateUI();
+            alert("Hasılatlar toplandı: +" + earnings.toLocaleString() + " ₺");
+        }
+
+        function resolveEvent(action) {
+            if(action === 'pay') {
+                playerState.cash -= 500;
+            } else {
+                playerState.prestige -= 2;
+            }
+            updateUI();
+            document.getElementById('event-card').style.opacity = '0.4';
+            document.getElementById('event-card').style.pointerEvents = 'none';
+            alert("Kriz çözüldü.");
+        }
+
+        function specialCharter() {
+            let profit = 35000;
+            playerState.cash += profit;
+            playerState.prestige += 3;
+            updateUI();
+            alert(`Özel deplasman seferi başarıyla tamamlandı! Kasa: +${profit.toLocaleString()} ₺`);
         }
     </script>
 </body>
